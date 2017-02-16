@@ -46,6 +46,7 @@ struct qvegas {
 	u32	beg_snd_una;	/* left edge  during last RTT */
 	u32	beg_snd_cwnd;	/* saves the size of the cwnd */
 	u32	lost_cwnd;	/* saves the size of the cwnd */
+	u32	reno_inc;
 	u8	doing_qvegas_now;/* if true, do qvegas for this RTT */
 	u16	cntRTT;		/* # of RTTs measured within last RTT */
 	u32	minRTT;		/* min of RTTs measured within last RTT (in usec) */
@@ -91,6 +92,7 @@ static void qvegas_enable(struct sock *sk)
 	qvegas->beg_snd_nxt = tp->snd_nxt;
 
 	qvegas->cntRTT = 0;
+	qvegas->reno_inc = 0;
 	qvegas->minRTT = 0x7fffffff;
 }
 
@@ -144,7 +146,7 @@ void tcp_qvegas_pkts_acked(struct sock *sk, const struct ack_sample *sample)
 }
 EXPORT_SYMBOL_GPL(tcp_qvegas_pkts_acked);
 
-u32  qvegas_undo_cwnd(struct sock *sk)
+u32 qvegas_undo_cwnd(struct sock *sk)
 {
 	struct qvegas *qvegas = inet_csk_ca(sk);
 
@@ -187,7 +189,7 @@ static inline u32 tcp_qvegas_ssthresh(struct tcp_sock *tp)
 	struct sock *sk = (struct sock *)tp;
 	struct qvegas *qvegas = inet_csk_ca(sk);
 
-	qvegas->lost_cwnd = tp->snd_cwnd;
+	qvegas->lost_cwnd = tp->snd_cwnd - qvegas->reno_inc;
 	return  min(tp->snd_ssthresh, tp->snd_cwnd-1);
 }
 
@@ -197,7 +199,10 @@ static void tcp_qvegas_cong_avoid(struct sock *sk, u32 ack, u32 acked)
 	struct qvegas *qvegas = inet_csk_ca(sk);
 
 	if (!qvegas->doing_qvegas_now) {
-		// do nothing;
+		u32 cwnd = tp->snd_cwnd;
+		tcp_reno_cong_avoid(sk, ack, acked);
+		qvegas->reno_inc += tp->snd_cwnd - cwnd;
+		return;
 	}
 
 	if (after(ack, qvegas->beg_snd_nxt)) {
@@ -219,7 +224,9 @@ static void tcp_qvegas_cong_avoid(struct sock *sk, u32 ack, u32 acked)
 		 */
 
 		if (qvegas->cntRTT <= 2) {
-			// do nothing;
+			u32 cwnd = tp->snd_cwnd;
+			tcp_reno_cong_avoid(sk, ack, acked);
+			qvegas->reno_inc += tp->snd_cwnd - cwnd;
 		} else  {
 			u32 rtt, diff;
 			u64 target_cwnd;//, tg;
