@@ -150,7 +150,7 @@ u32 qvegas_undo_cwnd(struct sock *sk)
 {
 	struct qvegas *qvegas = inet_csk_ca(sk);
 
-	return qvegas->lost_cwnd;
+	return max(qvegas->lost_cwnd, 2U);
 }
 
 void tcp_qvegas_state(struct sock *sk, u8 ca_state)
@@ -160,7 +160,7 @@ void tcp_qvegas_state(struct sock *sk, u8 ca_state)
 
 	if (ca_state == TCP_CA_Open) {
 		qvegas_enable(sk);
-		tp->snd_cwnd = qvegas->lost_cwnd;
+		tp->snd_cwnd = max(qvegas->lost_cwnd, 2U);
 	} else {
 		qvegas_disable(sk);
 	}
@@ -189,8 +189,8 @@ static inline u32 tcp_qvegas_ssthresh(struct tcp_sock *tp)
 	struct sock *sk = (struct sock *)tp;
 	struct qvegas *qvegas = inet_csk_ca(sk);
 
-	qvegas->lost_cwnd = tp->snd_cwnd - qvegas->reno_inc;
-	return  min(tp->snd_ssthresh, tp->snd_cwnd-1);
+	qvegas->lost_cwnd = max(tp->snd_cwnd - qvegas->reno_inc, 2U);
+	return  max(min(tp->snd_ssthresh, tp->snd_cwnd-1), 2U);
 }
 
 static void tcp_qvegas_cong_avoid(struct sock *sk, u32 ack, u32 acked)
@@ -348,7 +348,7 @@ static struct tcp_congestion_ops tcp_qvegas __read_mostly = {
 	.pkts_acked	= tcp_qvegas_pkts_acked,
 	.set_state	= tcp_qvegas_state,
 	.cwnd_event	= tcp_qvegas_cwnd_event,
-	.undo_cwnd		= qvegas_undo_cwnd,
+	.undo_cwnd	= qvegas_undo_cwnd,
 	.get_info	= tcp_qvegas_get_info,
 
 	.owner		= THIS_MODULE,
