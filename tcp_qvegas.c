@@ -109,7 +109,7 @@ void tcp_qvegas_init(struct sock *sk)
 	struct qvegas *qvegas = inet_csk_ca(sk);
 	
 	if (qvegas->baseRTT == 0)
-		qvegas->lost_cwnd = 10; 
+		qvegas->lost_cwnd = TCP_INIT_CWND; 
 	qvegas->baseRTT = 0x7fffffff;
 	qvegas_enable(sk);
 }
