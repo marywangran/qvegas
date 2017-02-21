@@ -189,7 +189,8 @@ static inline u32 tcp_qvegas_ssthresh(struct tcp_sock *tp)
 	struct sock *sk = (struct sock *)tp;
 	struct qvegas *qvegas = inet_csk_ca(sk);
 
-	qvegas->lost_cwnd = max(tp->snd_cwnd - qvegas->reno_inc>>1U, 2U);
+	if (tp->lost_out)
+		qvegas->lost_cwnd = max(tp->snd_cwnd - qvegas->reno_inc>>1U, 2U);
 	return  max(min(tp->snd_ssthresh, tp->snd_cwnd-1), 2U);
 }
 
